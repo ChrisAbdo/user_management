@@ -254,7 +254,7 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
 @router.post("/users/me/profile-picture", response_model=UserResponse)
 async def upload_profile_picture(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     minio_service: MinioService = Depends(get_minio_service),
     db: AsyncSession = Depends(get_db)
 ):
@@ -262,14 +262,34 @@ async def upload_profile_picture(
         raise HTTPException(400, "File must be an image")
     
     try:
+        # Get the actual user from database using the correct method name
+        user = await UserService.get_by_email(db, current_user["sub"])  # Changed user_id to sub and method name
+        if not user:
+            raise HTTPException(404, "User not found")
+            
         profile_picture_url = await minio_service.upload_profile_picture(file)
         
         # Update user's profile picture URL in database
-        current_user.profile_picture_url = profile_picture_url
-        db.add(current_user)
+        user.profile_picture_url = profile_picture_url
+        db.add(user)
         await db.commit()
-        await db.refresh(current_user)
+        await db.refresh(user)
         
-        return current_user
+        return UserResponse.model_construct(  # Added proper response construction
+            id=user.id,
+            bio=user.bio,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            nickname=user.nickname,
+            email=user.email,
+            role=user.role,
+            last_login_at=user.last_login_at,
+            profile_picture_url=user.profile_picture_url,
+            github_profile_url=user.github_profile_url,
+            linkedin_profile_url=user.linkedin_profile_url,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            links=create_user_links(user.id, Request)
+        )
     except Exception as e:
         raise HTTPException(500, f"Failed to upload profile picture: {str(e)}")

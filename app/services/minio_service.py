@@ -3,7 +3,7 @@ from fastapi import UploadFile
 import io
 from PIL import Image
 import uuid
-from config import Settings
+from settings.config import Settings
 
 class MinioService:
     def __init__(self, settings: Settings):

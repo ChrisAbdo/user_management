@@ -8,6 +8,7 @@ from app.services.email_service import EmailService
 from app.services.jwt_service import decode_token
 from settings.config import Settings
 from fastapi import Depends
+from app.services.minio_service import MinioService
 
 def get_settings() -> Settings:
     """Return application settings."""
@@ -50,3 +51,7 @@ def require_role(role: str):
             raise HTTPException(status_code=403, detail="Operation not permitted")
         return current_user
     return role_checker
+
+def get_minio_service() -> MinioService:
+    settings = get_settings()
+    return MinioService(settings)

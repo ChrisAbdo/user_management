@@ -256,14 +256,19 @@ async def upload_profile_picture(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
     minio_service: MinioService = Depends(get_minio_service),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    request: Request = None
 ):
     if not file.content_type.startswith('image/'):
         raise HTTPException(400, "File must be an image")
     
     try:
-        # Get the actual user from database using the correct method name
-        user = await UserService.get_by_email(db, current_user["sub"])  # Changed user_id to sub and method name
+        # Get the user by email since the 'sub' claim contains the email
+        user_email = current_user.get("sub")
+        if not user_email:
+            raise HTTPException(401, "Invalid token: missing user email")
+            
+        user = await UserService.get_by_email(db, user_email)
         if not user:
             raise HTTPException(404, "User not found")
             
@@ -275,7 +280,7 @@ async def upload_profile_picture(
         await db.commit()
         await db.refresh(user)
         
-        return UserResponse.model_construct(  # Added proper response construction
+        return UserResponse.model_construct(
             id=user.id,
             bio=user.bio,
             first_name=user.first_name,
@@ -289,7 +294,7 @@ async def upload_profile_picture(
             linkedin_profile_url=user.linkedin_profile_url,
             created_at=user.created_at,
             updated_at=user.updated_at,
-            links=create_user_links(user.id, Request)
+            links=create_user_links(user.id, request) if request else None
         )
     except Exception as e:
         raise HTTPException(500, f"Failed to upload profile picture: {str(e)}")

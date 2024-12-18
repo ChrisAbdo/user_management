@@ -33,3 +33,31 @@ async def test_upload_profile_picture(upload_file, settings):
     url = await minio_service.upload_profile_picture(upload_file)
     assert url.startswith("http://localhost:9000/profile-pictures/")
     assert url.endswith(".png")
+
+@pytest.mark.asyncio
+async def test_upload_non_image_file(settings):
+    non_image_file = UploadFile(
+        file=BytesIO(b"Not an image content"),
+        filename="test.txt",
+        headers={"content-type": "text/plain"}
+    )
+    minio_service = MinioService(settings)
+    with pytest.raises(Exception):
+        await minio_service.upload_profile_picture(non_image_file)
+
+@pytest.mark.asyncio
+async def test_upload_large_image(settings):
+    # Create a large test image
+    large_img = Image.fromarray(np.zeros((1000, 1000, 3), dtype=np.uint8))
+    img_byte_arr = BytesIO()
+    large_img.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    large_upload_file = UploadFile(
+        file=img_byte_arr,
+        filename="large_test.png",
+        headers={"content-type": "image/png"}
+    )
+    minio_service = MinioService(settings)
+    url = await minio_service.upload_profile_picture(large_upload_file)
+    assert url.startswith("http://localhost:9000/profile-pictures/")
+    assert url.endswith(".png")

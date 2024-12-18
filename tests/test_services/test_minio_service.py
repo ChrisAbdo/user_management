@@ -1,6 +1,6 @@
 import pytest
 from fastapi import UploadFile
-from services.minio_service import MinioService
+from app.services.minio_service import MinioService
 from io import BytesIO
 from PIL import Image
 import numpy as np

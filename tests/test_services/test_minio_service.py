@@ -4,6 +4,11 @@ from app.services.minio_service import MinioService
 from io import BytesIO
 from PIL import Image
 import numpy as np
+from app.dependencies import get_settings
+
+@pytest.fixture
+def settings():
+    return get_settings()
 
 @pytest.fixture
 def sample_image():

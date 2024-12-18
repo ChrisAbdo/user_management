@@ -5,6 +5,7 @@ from io import BytesIO
 from PIL import Image
 import numpy as np
 from app.dependencies import get_settings
+import uuid
 
 @pytest.fixture
 def settings():
@@ -76,20 +77,22 @@ async def test_upload_invalid_image_format(settings):
 
 @pytest.mark.asyncio
 async def test_upload_oversized_image(settings):
-    # Create a large test image (10MB)
-    large_img = Image.new('RGB', (5000, 5000), color='red')
+    # Create a very large image (>5MB)
+    large_img = Image.new('RGB', (3000, 3000), color='red')
     img_byte_arr = BytesIO()
-    large_img.save(img_byte_arr, format='PNG')
+    # Use uncompressed format to ensure large file size
+    large_img.save(img_byte_arr, format='BMP')
     img_byte_arr.seek(0)
     
     oversized_file = UploadFile(
         file=img_byte_arr,
-        filename="huge.png",
-        headers={"content-type": "image/png"}
+        filename="huge.bmp",
+        headers={"content-type": "image/bmp"}
     )
     minio_service = MinioService(settings)
     with pytest.raises(Exception, match="File size exceeds maximum limit"):
         await minio_service.upload_profile_picture(oversized_file)
+
         
 @pytest.mark.asyncio
 async def test_upload_empty_file(settings):
@@ -156,24 +159,30 @@ async def test_content_type_preservation(upload_file, settings):
 
 @pytest.mark.asyncio
 async def test_bucket_creation(settings):
+    test_bucket_name = f"test-bucket-{uuid.uuid4()}"
     minio_service = MinioService(settings)
-    bucket_name = f"test-bucket-{uuid.uuid4()}"
-    minio_service.bucket_name = bucket_name
+    original_bucket = minio_service.bucket_name
+    minio_service.bucket_name = test_bucket_name
     
-    # Upload should create bucket if it doesn't exist
-    img = Image.new('RGB', (100, 100), color='red')
-    img_byte_arr = BytesIO()
-    img.save(img_byte_arr, format='PNG')
-    img_byte_arr.seek(0)
-    
-    file = UploadFile(
-        file=img_byte_arr,
-        filename="test.png",
-        headers={"content-type": "image/png"}
-    )
-    
-    await minio_service.upload_profile_picture(file)
-    assert minio_service.client.bucket_exists(bucket_name)
+    try:
+        # Create a test image
+        img = Image.new('RGB', (100, 100), color='red')
+        img_byte_arr = BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
+        
+        test_file = UploadFile(
+            file=img_byte_arr,
+            filename="test.png",
+            headers={"content-type": "image/png"}
+        )
+        
+        # Upload should create bucket if it doesn't exist
+        await minio_service.upload_profile_picture(test_file)
+        assert minio_service.client.bucket_exists(test_bucket_name)
+    finally:
+        # Clean up: restore original bucket name
+        minio_service.bucket_name = original_bucket
     
 @pytest.mark.asyncio
 async def test_image_format_conversion(settings):

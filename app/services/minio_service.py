@@ -19,11 +19,21 @@ class MinioService:
             secure=False
         )
         self.bucket_name = "profile-pictures"
+        self.MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
     async def upload_profile_picture(self, file: UploadFile) -> str:
         try:
             # Read and validate image
             image_data = await file.read()
+            
+            # Check for empty file
+            if not image_data:
+                raise Exception("Empty file")
+                
+            # Check file size
+            if len(image_data) > self.MAX_FILE_SIZE:
+                raise Exception("File size exceeds maximum limit")
+                
             image = Image.open(io.BytesIO(image_data))
             
             # Resize image to standard size
@@ -36,6 +46,10 @@ class MinioService:
             
             # Generate unique filename
             file_name = f"{uuid.uuid4()}.png"
+            
+            # Ensure bucket exists
+            if not self.client.bucket_exists(self.bucket_name):
+                self.client.make_bucket(self.bucket_name)
             
             # Upload to Minio
             self.client.put_object(

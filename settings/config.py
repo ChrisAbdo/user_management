@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     smtp_port: int = Field(default=2525, description="SMTP port for sending emails")
     smtp_username: str = Field(default='your-mailtrap-username', description="Username for SMTP server")
     smtp_password: str = Field(default='your-mailtrap-password', description="Password for SMTP server")
+    minio_host: str = "minio"
+    minio_port: str = "9000"
+    minio_root_user: str = "minioadmin"
+    minio_root_password: str = "minioadmin"
 
 
     class Config:

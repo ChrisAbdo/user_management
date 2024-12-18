@@ -21,10 +21,10 @@ Key Highlights:
 from builtins import dict, int, len, str
 from datetime import timedelta
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Request, UploadFile, File
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies import get_current_user, get_db, get_email_service, require_role
+from app.dependencies import get_current_user, get_db, get_email_service, get_minio_service, require_role
 from app.schemas.pagination_schema import EnhancedPagination
 from app.schemas.token_schema import TokenResponse
 from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserUpdate
@@ -33,6 +33,10 @@ from app.services.jwt_service import create_access_token
 from app.utils.link_generation import create_user_links, generate_pagination_links
 from app.dependencies import get_settings
 from app.services.email_service import EmailService
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Request, UploadFile, File
+from app.models.user_model import User
+from app.services.minio_service import MinioService
+
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 settings = get_settings()
@@ -245,3 +249,52 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
     if await UserService.verify_email_with_token(db, user_id, token):
         return {"message": "Email verified successfully"}
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token")
+
+
+@router.post("/users/me/profile-picture", response_model=UserResponse)
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    minio_service: MinioService = Depends(get_minio_service),
+    db: AsyncSession = Depends(get_db),
+    request: Request = None
+):
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(400, "File must be an image")
+    
+    try:
+        # Get the user by email since the 'sub' claim contains the email
+        user_email = current_user.get("sub")
+        if not user_email:
+            raise HTTPException(401, "Invalid token: missing user email")
+            
+        user = await UserService.get_by_email(db, user_email)
+        if not user:
+            raise HTTPException(404, "User not found")
+            
+        profile_picture_url = await minio_service.upload_profile_picture(file)
+        
+        # Update user's profile picture URL in database
+        user.profile_picture_url = profile_picture_url
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        
+        return UserResponse.model_construct(
+            id=user.id,
+            bio=user.bio,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            nickname=user.nickname,
+            email=user.email,
+            role=user.role,
+            last_login_at=user.last_login_at,
+            profile_picture_url=user.profile_picture_url,
+            github_profile_url=user.github_profile_url,
+            linkedin_profile_url=user.linkedin_profile_url,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            links=create_user_links(user.id, request) if request else None
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Failed to upload profile picture: {str(e)}")

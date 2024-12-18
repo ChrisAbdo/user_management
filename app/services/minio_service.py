@@ -1,3 +1,8 @@
+"""
+Minio service to handle file uploads to Minio.
+It provides a method to upload profile pictures to Minio. The image is resized to 200x200 pixels and saved as a PNG file.
+It is then uploaded to the Minio server and the URL is returned, also setting the user's profile picture to the new URL.
+"""
 from minio import Minio
 from fastapi import UploadFile
 import io

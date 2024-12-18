@@ -32,6 +32,7 @@ services:
 
   fastapi:
     build: .
+    image: chrisabdo/is218final:latest
     volumes:
       - ./:/myapp/
     depends_on:

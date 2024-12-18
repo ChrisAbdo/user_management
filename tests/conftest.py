@@ -163,9 +163,17 @@ async def unverified_user(db_session):
 @pytest.fixture(scope="function")
 async def users_with_same_role_50_users(db_session):
     users = []
+    used_nicknames = set()
+    
     for _ in range(50):
+        while True:
+            nickname = fake.user_name()
+            if nickname not in used_nicknames:
+                used_nicknames.add(nickname)
+                break
+                
         user_data = {
-            "nickname": fake.user_name(),
+            "nickname": nickname,
             "first_name": fake.first_name(),
             "last_name": fake.last_name(),
             "email": fake.email(),

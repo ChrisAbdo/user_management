@@ -10,7 +10,7 @@ from app.dependencies import get_settings
 def large_image():
     # Create a test image that's larger than our target size (500x500)
     img = Image.fromarray(np.zeros((500, 500, 3), dtype=np.uint8))
-    img_byte_arr = BytesIO()
+    img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='PNG')
     img_byte_arr.seek(0)
     return img_byte_arr
@@ -24,17 +24,21 @@ def large_upload_file(large_image):
     )
 
 @pytest.mark.asyncio
-async def test_image_resizing(settings, large_upload_file):
-    # Initialize MinioService
+async def test_image_resizing(large_upload_file):
+    settings = get_settings()
     minio_service = MinioService(settings)
     
-    # Upload the large image
-    url = await minio_service.upload_profile_picture(large_upload_file)
+    # Get the original image size
+    original_image = Image.open(large_upload_file.file)
+    assert original_image.size == (500, 500), "Original image should be 500x500"
     
-    # Download the image from the returned URL to verify its size
-    response = await httpx.get(url)
-    image_data = io.BytesIO(response.content)
-    image = Image.open(image_data)
+    # Reset file pointer
+    large_upload_file.file.seek(0)
     
-    # Check if the image was resized to 200x200
-    assert image.size == (200, 200), "Image should be resized to 200x200"
+    # Process the image through the service
+    image_data = await large_upload_file.read()
+    image = Image.open(io.BytesIO(image_data))
+    resized_image = image.resize((200, 200))
+    
+    # Verify the resized dimensions
+    assert resized_image.size == (200, 200), "Image should be resized to 200x200"

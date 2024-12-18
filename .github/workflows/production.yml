@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.10.12] # Define Python versions here
+        python-version: [3.10.12]
     services:
       postgres:
         image: postgres:latest
@@ -24,6 +24,16 @@ jobs:
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+          - 9001:9001
+
     steps:
       - uses: actions/checkout@v4
 
@@ -47,39 +57,11 @@ jobs:
 
       - name: Run tests with Pytest
         env:
-          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/myappdb # Configure the DATABASE_URL environment variable for tests
-        run: pytest
-
-  build-and-push-docker:
-    needs: test
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          tags: woffee/wis_club_api:${{ github.sha }} # Uses the Git SHA for tagging, change 'woffee' to your DockerHub username
-          platforms: linux/amd64,linux/arm64 # Multi-platform support
-          cache-from: type=registry,ref=woffee/wis_club_api:cache # change 'woffee' to your DockerHub username
-          cache-to: type=inline,mode=max
-
-      # - name: Scan the Docker image
-      #   uses: aquasecurity/trivy-action@master
-      #   with:
-      #     image-ref: 'woffee/wis_club_api:${{ github.sha }}'
-      #     format: 'table'
-      #     exit-code: '1' # Fail the job if vulnerabilities are found
-      #     ignore-unfixed: true
-      #     severity: 'CRITICAL,HIGH'
+          DATABASE_URL: postgresql+asyncpg://user:password@localhost:5432/myappdb
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+          MINIO_HOST: localhost
+          MINIO_PORT: 9000
+        run: |
+          sleep 10  # Give MinIO time to fully start up
+          pytest

@@ -1,3 +1,4 @@
+# test resizing
 import pytest
 from fastapi import UploadFile
 from PIL import Image

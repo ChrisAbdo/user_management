@@ -17,9 +17,9 @@ def sample_image():
 @pytest.fixture
 def upload_file(sample_image):
     return UploadFile(
-        filename="test.png",
         file=sample_image,
-        content_type="image/png"
+        filename="test.png",
+        headers={"content-type": "image/png"}
     )
 
 @pytest.mark.asyncio

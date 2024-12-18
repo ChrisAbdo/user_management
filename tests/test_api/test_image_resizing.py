@@ -43,8 +43,7 @@ def small_upload_file(small_image):
 
 @pytest.mark.asyncio
 async def test_image_resizing(large_upload_file):
-    settings = get_settings()
-    minio_service = MinioService(settings)
+    # No need to initialize MinioService for testing resize logic
     
     # Get the original image size
     original_image = Image.open(large_upload_file.file)
@@ -53,7 +52,7 @@ async def test_image_resizing(large_upload_file):
     # Reset file pointer
     large_upload_file.file.seek(0)
     
-    # Process the image through the service
+    # Process the image
     image_data = await large_upload_file.read()
     image = Image.open(io.BytesIO(image_data))
     resized_image = image.resize((200, 200))
